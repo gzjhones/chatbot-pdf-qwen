@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ─────────────────────────────────────────────────────────────────────
-# PDF Analyzer — arranque en un Pod de RunPod
+# Revisor ortográfico de PDF — arranque en un Pod de RunPod
 #
 # Antes de crear el Pod:
 #   • Plantilla: "RunPod PyTorch" (o cualquier Ubuntu con CUDA)
@@ -9,8 +9,10 @@
 #   • (Opcional) Environment Variables: API_KEY=tu-clave  MODEL_NAME=qwen3:1.7b
 #
 # En la terminal web del Pod:
-#   cd /workspace && git clone https://github.com/gzjhones/chatbot-pdf-qwen.git
+#   cd /workspace && git clone -b revisor_ortografico https://github.com/gzjhones/chatbot-pdf-qwen.git
 #   cd chatbot-pdf-qwen && bash deploy/start_runpod.sh
+#
+# Prompt: edita /workspace/chatbot-pdf-qwen/prompt.txt (se aplica sin reiniciar)
 #
 # URL pública resultante:  https://<RUNPOD_POD_ID>-5050.proxy.runpod.net
 # ─────────────────────────────────────────────────────────────────────

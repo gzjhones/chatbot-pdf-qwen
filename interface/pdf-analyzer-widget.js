@@ -1,6 +1,6 @@
 /**
  * pdf-analyzer-widget.js
- * Widget embebible para análisis de PDFs con Ollama.
+ * Widget embebible: revisor ortográfico de PDFs con Ollama.
  * Uso: <script src="pdf-analyzer-widget.js"></script>
  */
 (function () {
@@ -374,7 +374,7 @@
       <!-- Header -->
       <div class="header">
         <span class="header-icon">📄</span>
-        <span class="header-title">Analizador PDF</span>
+        <span class="header-title">Revisor ortográfico</span>
         <button class="header-btn" id="btnExpand" title="Expandir / Compactar">⤢</button>
         <button class="header-btn" id="btnClose"  title="Cerrar">✕</button>
       </div>
@@ -405,7 +405,7 @@
 
         <!-- Analyze button -->
         <button class="btn btn-primary hidden" id="btnAnalyze">
-          🔍 Analizar documento
+          🔍 Revisar ortografía
         </button>
 
         <!-- Spinner -->
@@ -427,16 +427,16 @@
 
             <div class="card">
               <div class="card-header">
-                <span class="card-icon">🎯</span>
-                <span class="card-label">Objetivos</span>
+                <span class="card-icon">❌</span>
+                <span class="card-label">Errores encontrados</span>
               </div>
               <div class="card-body" id="cardObjetivos"></div>
             </div>
 
             <div class="card">
               <div class="card-header">
-                <span class="card-icon">📝</span>
-                <span class="card-label">Conclusiones</span>
+                <span class="card-icon">✏️</span>
+                <span class="card-label">Oraciones corregidas</span>
               </div>
               <div class="card-body" id="cardConclusiones"></div>
             </div>
@@ -444,7 +444,7 @@
             <div class="card">
               <div class="card-header">
                 <span class="card-icon">⭐</span>
-                <span class="card-label">Valoración general</span>
+                <span class="card-label">Valoración ortográfica</span>
               </div>
               <div class="card-body">
                 <div class="stars" id="starsRow"></div>
@@ -460,7 +460,7 @@
           </details>
 
           <button class="btn btn-ghost" id="btnReset" style="margin-top:10px">
-            ↩ Analizar otro PDF
+            ↩ Revisar otro PDF
           </button>
         </div><!-- /results -->
 
@@ -674,7 +674,9 @@
           throw new Error(err.error || `HTTP ${res.status}`);
         }
 
-        renderResults(await res.json());
+        /* El servidor responde con un job_id; consultamos el avance */
+        const { job_id } = await res.json();
+        renderResults(await waitForJob(job_id));
 
       } catch (err) {
         showError('Error: ' + err.message);
@@ -693,6 +695,30 @@
       hideError();
       checkHealth();
     });
+
+    /* ── Polling del trabajo en el servidor ──────────────────── */
+    async function waitForJob(jobId) {
+      const url = API_BASE + '/jobs/' + jobId;
+      let fallos = 0;
+      while (true) {
+        await new Promise(r => setTimeout(r, 2000));
+        let d;
+        try {
+          const r = await fetch(url, { headers: apiHeaders() });
+          d = await r.json();
+          if (!r.ok) throw new Error(d.error || `HTTP ${r.status}`);
+          fallos = 0;
+        } catch (e) {
+          if (++fallos >= 5) throw e;          // tolera cortes breves del túnel
+          continue;
+        }
+        if (d.estado === 'listo') return d.resultado;
+        if (d.estado === 'error') throw new Error(d.error);
+        setLoading(true, d.total
+          ? `Revisando bloque ${d.progreso} de ${d.total}…`
+          : 'Extrayendo texto…');
+      }
+    }
 
     /* ── Helpers ─────────────────────────────────────────────── */
     function toBase64(file) {
@@ -792,11 +818,11 @@
       modelName.textContent = d.modelo_usado  || '—';
       rawText.textContent   = d.texto_completo || '';
 
-      cardObjetivos.innerHTML  = parseMarkdown(d.objetivos);
-      cardConclus.innerHTML    = parseMarkdown(d.conclusiones);
+      cardObjetivos.innerHTML  = parseMarkdown(d.errores);
+      cardConclus.innerHTML    = parseMarkdown(d.correcciones);
       cardValoracion.innerHTML = parseMarkdown(d.valoracion);
 
-      const n = extractStars(d.valoracion || '');
+      const n = d.estrellas || extractStars(d.valoracion || '');
       starsRow.textContent = n > 0
         ? '★'.repeat(n) + '☆'.repeat(Math.max(0, 5 - n)) : '';
 
@@ -806,7 +832,7 @@
       statusModel.textContent = '🦙 ' + (d.modelo_usado || '—');
       statusModel.classList.remove('hidden');
       statusDot.className = 'dot ok';
-      statusText.textContent = 'Análisis completado';
+      statusText.textContent = 'Revisión completada';
     }
   }
 

@@ -1,3 +1,29 @@
+# Revisor ortográfico de PDF — rama `revisor_ortografico`
+
+Variante del PDF Analyzer que revisa **solo ortografía** (tildes, letras, mayúsculas, puntuación básica).
+
+## Qué cambia respecto a `external_deploy`
+
+| Archivo | Cambio |
+|---|---|
+| `prompt.txt` | **Prompt maestro editable.** Se lee en cada revisión, no hace falta reiniciar Flask |
+| `server/app.py` | Limpieza del texto del PDF (guiones de corte, ligaduras); revisión **por bloques**; trabajo en segundo plano (`POST /analyze` → `job_id`, `GET /jobs/<id>`); parser `ERRORES` / `CORRECCIONES`; valoración calculada por densidad de errores |
+| `config.json` | `temperature` 0.1, `chunk_chars`, `max_chunks`, `num_ctx` |
+| `interface/pdf-analyzer-widget.js` | Tarjetas *Errores*, *Oraciones corregidas*, *Valoración ortográfica*; muestra el avance "bloque N de M" |
+| `deploy/colab_server.ipynb` | `BRANCH = 'revisor_ortografico'` + celda para editar `prompt.txt` |
+| `deploy/start_runpod.sh` | Clona esta rama |
+
+### Reglas del prompt
+Si editas `prompt.txt`, mantén los títulos `ERRORES:` y `CORRECCIONES:` y el formato
+`- incorrecto → correcto`. El parser de `server/app.py` (`parse_block`) depende de ellos.
+
+### Valoración
+Se calcula a partir de los errores únicos por cada 1000 palabras: ≤1 ★★★★★, ≤3 ★★★★, ≤6 ★★★, ≤10 ★★, más ★.
+
+> `notebook/analyzer.ipynb` sigue siendo el analizador original (objetivos/conclusiones) y no afecta a la web.
+
+---
+
 # PDF Analyzer — versión Ollama
 
 Análisis inteligente de documentos PDF usando modelos locales a través de **Ollama**.
