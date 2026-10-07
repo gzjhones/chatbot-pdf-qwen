@@ -45,11 +45,19 @@
   </ul>
 
   <div class="note">
-    ⚙️ Requiere que el servidor Flask esté corriendo:<br>
-    <code>python server/app.py</code> &nbsp;→&nbsp; <code>http://localhost:5050</code>
+    ⚙️ Servidor activo: <code id="api-shown"></code><br>
+    Para apuntar a Colab o RunPod abre esta página así:<br>
+    <code>index.html?api=https://xxxx.trycloudflare.com</code><br>
+    <code>index.html?api=https://PODID-5050.proxy.runpod.net&amp;key=TU_CLAVE</code>
   </div>
 
-  <!-- Una sola línea activa el widget -->
+  <!-- Una sola línea activa el widget.
+       También puedes fijar el servidor aquí:
+       <script src="pdf-analyzer-widget.js" data-api-base="https://..." data-api-key="..."></script> -->
   <script src="pdf-analyzer-widget.js"></script>
+  <script>
+    document.getElementById('api-shown').textContent =
+      new URLSearchParams(location.search).get('api') || 'http://localhost:5050';
+  </script>
 </body>
 </html>

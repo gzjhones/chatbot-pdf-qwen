@@ -6,7 +6,37 @@
 (function () {
   'use strict';
 
-  const API_URL = 'http://localhost:5050/analyze';
+  /* ── Servidor remoto configurable ───────────────────────────────
+     Prioridad: ?api=URL en la barra de direcciones  →
+                data-api-base en el <script>         →
+                window.PDF_ANALYZER_API              →
+                http://localhost:5050
+     Ejemplos:
+       index.html?api=https://xxxx.trycloudflare.com        (Colab)
+       index.html?api=https://PODID-5050.proxy.runpod.net   (RunPod)
+  ─────────────────────────────────────────────────────────────── */
+  const SCRIPT_TAG = document.currentScript;
+  const QS = new URLSearchParams(window.location.search);
+  const API_BASE = (
+    QS.get('api') ||
+    (SCRIPT_TAG && SCRIPT_TAG.dataset.apiBase) ||
+    window.PDF_ANALYZER_API ||
+    'http://localhost:5050'
+  ).replace(/\/+$/, '');
+  const API_KEY = QS.get('key') ||
+    (SCRIPT_TAG && SCRIPT_TAG.dataset.apiKey) ||
+    window.PDF_ANALYZER_KEY || '';
+
+  const API_URL    = API_BASE + '/analyze';
+  const HEALTH_URL = API_BASE + '/health';
+
+  /* Cabeceras comunes. 'ngrok-skip-browser-warning' evita la página
+     intermedia de ngrok gratuito; otros proxies la ignoran. */
+  function apiHeaders(extra) {
+    const h = Object.assign({ 'ngrok-skip-browser-warning': '1' }, extra || {});
+    if (API_KEY) h['X-API-Key'] = API_KEY;
+    return h;
+  }
 
   /* ══════════════════════════════════════════════════════════════════
      CSS (inyectado en Shadow DOM — no afecta a la página huésped)
@@ -565,8 +595,8 @@
       statusText.textContent = 'Comprobando servidor…';
       statusModel.classList.add('hidden');
       try {
-        const r = await fetch('http://localhost:5050/health',
-          { signal: AbortSignal.timeout(5000) });
+        const r = await fetch(HEALTH_URL,
+          { headers: apiHeaders(), signal: AbortSignal.timeout(15000) });
         const d = await r.json();
         if (d.ollama_ok) {
           statusDot.className = 'dot ok';
@@ -635,7 +665,7 @@
 
         const res = await fetch(API_URL, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: apiHeaders({ 'Content-Type': 'application/json' }),
           body: JSON.stringify({ pdf_base64: b64 }),
         });
 

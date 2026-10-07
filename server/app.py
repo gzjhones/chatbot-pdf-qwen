@@ -14,10 +14,22 @@ from flask_cors import CORS
 CONFIG_PATH = os.path.join(os.path.dirname(__file__), "..", "config.json")
 
 def load_config() -> dict:
+    """Lee config.json; las variables de entorno tienen prioridad.
+
+    OLLAMA_URL   → URL de Ollama (por defecto la de config.json)
+    MODEL_NAME   → modelo de Ollama
+    """
     with open(CONFIG_PATH, "r", encoding="utf-8") as f:
-        return json.load(f)
+        cfg = json.load(f)
+    cfg["ollama_url"] = os.environ.get("OLLAMA_URL", cfg.get("ollama_url", "http://localhost:11434"))
+    cfg["model_name"] = os.environ.get("MODEL_NAME", cfg["model_name"])
+    return cfg
 
 config = load_config()
+
+# Puerto y clave opcional (para no dejar la GPU abierta a cualquiera)
+PORT    = int(os.environ.get("PORT", 5050))
+API_KEY = os.environ.get("API_KEY", "")
 
 # ---------------------------------------------------------------------------
 # System prompt maestro
@@ -121,7 +133,21 @@ def parse_analysis(raw: str) -> dict:
 # Flask app
 # ---------------------------------------------------------------------------
 app = Flask(__name__)
-CORS(app)
+# CORS abierto: la página se abre en local (file:// u origen localhost)
+# y llama a un dominio público (trycloudflare / ngrok / runpod proxy).
+CORS(app, resources={r"/*": {"origins": "*"}},
+     allow_headers=["Content-Type", "X-API-Key", "ngrok-skip-browser-warning"])
+app.config["MAX_CONTENT_LENGTH"] = 50 * 1024 * 1024  # 50 MB (PDF en base64)
+
+
+@app.before_request
+def check_api_key():
+    """Si API_KEY está definida, exige la cabecera X-API-Key (salvo preflight)."""
+    if not API_KEY or request.method == "OPTIONS":
+        return None
+    if request.headers.get("X-API-Key") != API_KEY:
+        return jsonify({"error": "API key inválida o ausente"}), 401
+    return None
 
 
 @app.route("/health", methods=["GET"])
@@ -164,7 +190,7 @@ def analyze():
     try:
         raw_response = call_ollama(texto, cfg)
     except requests.exceptions.ConnectionError:
-        return jsonify({"error": "No se puede conectar a Ollama. ¿Está corriendo en http://localhost:11434?"}), 503
+        return jsonify({"error": f"No se puede conectar a Ollama en {cfg['ollama_url']}. ¿Está corriendo 'ollama serve'?"}), 503
     except requests.exceptions.HTTPError as exc:
         return jsonify({"error": f"Error de Ollama: {exc}"}), 502
     except Exception as exc:
@@ -188,5 +214,6 @@ if __name__ == "__main__":
     cfg = load_config()
     print(f"[INFO] Modelo configurado : {cfg['model_name']}")
     print(f"[INFO] Ollama URL         : {cfg['ollama_url']}")
-    print(f"[INFO] Servidor en        : http://0.0.0.0:5050")
-    app.run(host="0.0.0.0", port=5050, debug=False)
+    print(f"[INFO] Servidor en        : http://0.0.0.0:{PORT}")
+    print(f"[INFO] API key            : {'activada' if API_KEY else 'desactivada'}")
+    app.run(host="0.0.0.0", port=PORT, debug=False, threaded=True)
